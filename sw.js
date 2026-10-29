@@ -1,10 +1,7 @@
 // يحفظ ملفات المنصة على الجهاز لتفتح بدون إنترنت.
 // البيانات نفسها لا تُخزَّن هنا (طابور الإرسال في IndexedDB، وآخر نسخة من البنود في التخزين المحلي).
-const VERSION = 'jenan-v1';
-const SHELL = [
-  './', './index.html', './css/app.css', './js/app.js', './js/data.js', './js/config.js',
-  './manifest.webmanifest', './icons/icon.svg', './icons/icon-192.png', './icons/icon-180.png',
-];
+const VERSION = 'jenan-v3';
+const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-180.png'];
 const CACHE_HOSTS = ['cdn.jsdelivr.net', 'fonts.googleapis.com', 'fonts.gstatic.com'];
 
 self.addEventListener('install', e => {
