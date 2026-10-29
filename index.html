@@ -438,6 +438,41 @@ details.more summary small { color: var(--muted); font-weight: 400; margin-inlin
 .search input[type=search] { border: 0; outline: 0; background: transparent; min-height: 0; padding: 0; border-radius: 0; height: 100%; }
 .search:focus-within { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary); }
 
+/* ---------- تعديلات: أزرار علوية، زر حرج، بطاقة مختصرة ---------- */
+.shell { grid-template-rows: auto auto minmax(0, 1fr); grid-template-areas: "top" "chips" "main"; }
+.top { grid-template-areas: "brand sync" "nav nav" "search search"; }
+.topnav { grid-area: nav; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.topnav button {
+  min-height: 54px; border: 1px solid var(--line); background: var(--surface); border-radius: 12px;
+  display: grid; justify-items: center; align-content: center; gap: 2px; font-size: 12.5px; font-weight: 700; color: var(--muted); padding: 4px 0;
+}
+.topnav button .ic { width: 22px; height: 22px; }
+.topnav button.add { background: var(--primary); color: var(--primary-ink); border-color: transparent; }
+.topnav button.add .ic { stroke-width: 2.6; }
+.topnav button.on { color: var(--primary-text); border-color: var(--primary); background: var(--primary-soft); }
+.list { padding-bottom: calc(16px + var(--safe-b)); }
+.card { gap: 7px; }
+.c2 { gap: 8px; }
+.c2 .ref { margin-inline-start: auto; }
+.c2 .due { font-size: 13px; color: var(--muted); }
+.c2 .due.late { color: var(--crit); }
+.c2 .due.soon { color: var(--open); }
+.c2 .pend { margin-inline-start: auto; }
+.toggle {
+  display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 46px; align-self: end;
+  border: 1px solid var(--line2); border-radius: 11px; font-weight: 700; color: var(--text); cursor: pointer;
+}
+.toggle input { position: absolute; opacity: 0; pointer-events: none; }
+.toggle .ic { width: 18px; height: 18px; }
+.toggle.on { background: var(--crit-bg); color: var(--crit); border-color: var(--crit); }
+.toggle:has(input:focus-visible) { outline: 2.5px solid var(--primary); outline-offset: 2px; }
+@media (min-width: 900px) {
+  .shell { grid-template-rows: auto auto minmax(0, 1fr); grid-template-areas: "top top" "chips detail" "list detail"; }
+  .top { grid-template-columns: auto auto minmax(220px, 1fr) auto; grid-template-areas: "brand nav search sync"; }
+  .topnav { grid-template-columns: repeat(4, 84px); }
+  .topnav button { min-height: 48px; }
+}
+
 </style>
 </head>
 <body>
@@ -1020,6 +1055,10 @@ function whoText(it) {
   const w = ballWith(it);
   return w === S.me.role ? { t: 'مطلوب منك', mine: true } : { t: 'عند ' + T.role[w], mine: false };
 }
+function shortState(it) {
+  if (it.status === 'closed' || it.status === 'hold') return T.status[it.status];
+  return ballWith(it) === S.me.role ? 'عندي' : 'عند ' + T.role[ballWith(it)];
+}
 function dueText(it) {
   if (it.status === 'closed') return { t: 'أُغلق ' + (it.closed_at ? fmtDate.format(new Date(it.closed_at)) : ''), cls: '' };
   if (!it.due_date) return { t: 'بدون موعد', cls: 'muted' };
@@ -1071,14 +1110,14 @@ function renderShell() {
   <div class="shell">
     <header class="top">
       <div class="brand"><div class="logo sm">ج</div><div class="bt"><b>جنان</b><small>${esc(S.project.name)}</small></div></div>
+      <nav class="topnav" aria-label="التنقل">
+        <button data-act="home" id="nb-home">${ic('home')}<span>الرئيسية</span></button>
+        <button class="add" data-act="add">${ic('plus')}<span>إضافة</span></button>
+        <button data-act="filter" id="nb-filter">${ic('filter')}<span>تصفية</span></button>
+        <button data-act="more">${ic('user')}<span>حسابي</span></button>
+      </nav>
       <label class="search">${ic('search')}<input id="q" type="search" placeholder="رقم الفيلا أو كلمة" enterkeyhint="search" aria-label="بحث"></label>
       <button class="sync" id="sync" data-act="more" aria-label="حالة المزامنة"></button>
-      <div class="wide-only top-actions">
-        <button class="btn ghost" data-act="view" data-view="villas" id="tv-villas">${ic('grid')}الفلل</button>
-        <button class="btn ghost" data-act="filter">${ic('filter')}تصفية</button>
-        <button class="btn primary" data-act="add">${ic('plus')}بند جديد</button>
-        <button class="iconbtn" data-act="more" aria-label="حسابي">${ic('user')}</button>
-      </div>
     </header>
     <nav class="chips" id="chips" aria-label="مؤشرات سريعة"></nav>
     <main class="main">
@@ -1088,13 +1127,6 @@ function renderShell() {
       </section>
       <section class="detail" id="detail" aria-label="تفاصيل البند"></section>
     </main>
-    <nav class="bottom" aria-label="التنقل">
-      <button data-act="view" data-view="home" id="nb-home">${ic('home')}<span>الرئيسية</span></button>
-      <button data-act="view" data-view="villas" id="nb-villas">${ic('grid')}<span>الفلل</span></button>
-      <button class="fab" data-act="add" aria-label="إضافة بند">${ic('plus')}</button>
-      <button data-act="filter" id="nb-filter">${ic('filter')}<span>تصفية</span></button>
-      <button data-act="more">${ic('user')}<span>حسابي</span></button>
-    </nav>
   </div>
   <div id="sheet"></div>
   <div id="toast" role="status" aria-live="polite"></div>
@@ -1142,7 +1174,7 @@ function filterSummary() {
 }
 
 function cardHTML(it) {
-  const who = whoText(it), due = dueText(it), pend = it.pending || pendingFor(it).length;
+  const due = dueText(it), pend = it.pending || pendingFor(it).length;
   const sel = S.sel != null && getItem(S.sel) === it;
   return `
   <button class="card p-${it.priority}${sel ? ' sel' : ''}${active(it) ? '' : ' done'}" data-act="open" data-key="${esc(String(it.id))}">
@@ -1152,14 +1184,9 @@ function cardHTML(it) {
       ${unread(it) ? `<span class="newdot" title="جديد">${ic('dot')}</span>` : ''}
     </div>
     <div class="c2">
-      ${statusBadge(it.status)}
-      <span class="who${who.mine ? ' mine' : ''}">${who.mine ? ic('user') : ''}${esc(who.t)}</span>
-    </div>
-    <div class="c3">
-      <span class="due ${due.cls}">${due.cls === 'late' ? ic('clock') : ''}${esc(due.t)}</span>
-      ${it.priority === 'critical' ? `<span class="prio crit">${ic('alert')}حرجة</span>` : ''}
-      <span class="type">${T.typeShort[it.type]}</span>
-      ${pend ? `<span class="pend">${ic('sync')}بانتظار الإرسال</span>` : `<span class="ref">#${it.id}</span>`}
+      <span class="due ${due.cls}">${esc(due.t)}</span>
+      <span class="st st-${it.status}">${shortState(it)}</span>
+      ${pend ? `<span class="pend">${ic('sync')}</span>` : `<span class="ref">#${it.id}</span>`}
     </div>
   </button>`;
 }
@@ -1340,8 +1367,7 @@ function closeSheet() { if (S.sheet) history.back(); }
 function photoPicker(sheet, label = 'صورة') {
   return `
   <div class="pick">
-    <label class="btn ghost">${ic('camera')}${label}<input type="file" accept="image/*" capture="environment" data-photos hidden></label>
-    <label class="btn ghost icon-only" aria-label="من الألبوم">${ic('image')}<input type="file" accept="image/*" multiple data-photos hidden></label>
+    <label class="btn ghost">${ic('image')}${label}<input type="file" accept="image/*" multiple data-photos hidden></label>
     <div class="thumbs">${(sheet.photos || []).map((p, i) => `
       <span class="thumb"><img src="${p.url}" alt=""><button type="button" data-act="rm-photo" data-i="${i}" aria-label="حذف">${ic('x')}</button></span>`).join('')}
       ${sheet.busy ? `<span class="thumb busy">${ic('sync', 'spin')}</span>` : ''}</div>
@@ -1368,7 +1394,7 @@ function renderSheet() {
   const form = root.querySelector('form.sheet-form');
   if (form && form.dataset.sk === s.kind) {
     const v = readForm(form);
-    if (s.data) { Object.assign(s.data, v); s.data.open = !!form.querySelector('details')?.open; }
+    if (s.data) { Object.assign(s.data, v); s.data.critical = !!v.critical; }
     if ('body' in v) s.body = v.body;
   }
   let inner = '';
@@ -1409,26 +1435,22 @@ function addSheet(s) {
       <label class="lbl">العنوان
         <input name="title" value="${esc(d.title)}" required minlength="2" maxlength="200" autocomplete="off" placeholder="${R === 'consultant' ? 'مثال: إزالة الصخور قبل طبقة الدفان التالية' : 'مثال: الدفان حول الخزان جاهز للاستلام'}">
       </label>
-      ${photoPicker(s, R === 'consultant' ? 'صورة' : 'صورة الوضع')}
-      <details class="more"${d.open ? ' open' : ''}>
-        <summary>تفاصيل إضافية <small>${T.prio[d.priority]} · ${d.due ? fmtDate.format(dd(d.due)) : 'بدون موعد'}</small></summary>
-        <label class="lbl">الوصف<textarea name="description" rows="3" maxlength="4000" placeholder="اختياري">${esc(d.description)}</textarea></label>
-        <div class="lbl">الأولوية ${seg('priority', [['critical', 'حرجة', 'alert'], ['normal', 'عادية', ''], ['low', 'منخفضة', '']], d.priority)}</div>
-        <div class="row2">
-          <label class="lbl">الاستحقاق<input name="due" type="date" value="${esc(d.due)}"></label>
-          <label class="lbl">مرجع WIR / NCR<input name="external_ref" value="${esc(d.external_ref)}" maxlength="60" dir="ltr" placeholder="اختياري"></label>
-        </div>
-      </details>
+      ${photoPicker(s, 'صور')}
+      <label class="lbl">الوصف<textarea name="description" rows="2" maxlength="4000" placeholder="اختياري">${esc(d.description)}</textarea></label>
+      <div class="row2">
+        <label class="toggle${d.critical ? ' on' : ''}"><input type="checkbox" name="critical"${d.critical ? ' checked' : ''}>${ic('alert')}حرج</label>
+        <label class="lbl">الاستحقاق<input name="due" type="date" value="${esc(d.due)}"></label>
+      </div>
     </div>
     <div class="sheet-f"><button class="btn primary block" type="submit"${s.busy ? ' disabled' : ''}>${ic('check')}حفظ</button></div>
   </form>`;
 }
 
 const ACT = {
-  comment: { title: 'رد', ph: 'اكتب ردك…', need: 'any', btn: 'إرسال', icon: 'send', photo: 'صورة' },
-  submit: { title: 'الإجراء المنفذ', ph: 'ماذا تم تنفيذه؟', need: 'any', btn: 'إرسال للمراجعة', icon: 'send', photo: 'صورة بعد المعالجة' },
-  close: { title: 'قبول وإغلاق البند', ph: 'ملاحظة (اختياري)', need: 'none', btn: 'اعتماد وإغلاق', icon: 'check', photo: 'صورة' },
-  return: { title: 'إعادة للمعالجة', ph: 'سبب الإعادة (مطلوب)', need: 'text', btn: 'إعادة للمقاول', icon: 'undo', photo: 'صورة' },
+  comment: { title: 'رد', ph: 'اكتب ردك…', need: 'any', btn: 'إرسال', icon: 'send', photo: 'صور' },
+  submit: { title: 'الإجراء المنفذ', ph: 'ماذا تم تنفيذه؟', need: 'any', btn: 'إرسال للمراجعة', icon: 'send', photo: 'صور بعد المعالجة' },
+  close: { title: 'قبول وإغلاق البند', ph: 'ملاحظة (اختياري)', need: 'none', btn: 'اعتماد وإغلاق', icon: 'check', photo: 'صور' },
+  return: { title: 'إعادة للمعالجة', ph: 'سبب الإعادة (مطلوب)', need: 'text', btn: 'إعادة للمقاول', icon: 'undo', photo: 'صور' },
   hold: { title: 'إيقاف البند', ph: 'سبب الإيقاف (مطلوب)', need: 'text', btn: 'إيقاف', icon: 'pause' },
   resume: { title: 'استئناف البند', ph: 'ملاحظة (اختياري)', need: 'none', btn: 'استئناف', icon: 'play' },
   reopen: { title: 'إعادة فتح البند', ph: 'سبب إعادة الفتح (مطلوب)', need: 'text', btn: 'إعادة فتح', icon: 'undo' },
@@ -1456,10 +1478,9 @@ function editSheet(s) {
       <label class="lbl">رقم الفيلا / الموقع<input name="villa" value="${esc(d.villa)}" required maxlength="40"></label>
       <label class="lbl">العنوان<input name="title" value="${esc(d.title)}" required minlength="2" maxlength="200"></label>
       <label class="lbl">الوصف<textarea name="description" rows="3" maxlength="4000">${esc(d.description)}</textarea></label>
-      <div class="lbl">الأولوية ${seg('priority', [['critical', 'حرجة', 'alert'], ['normal', 'عادية', ''], ['low', 'منخفضة', '']], d.priority)}</div>
       <div class="row2">
+        <label class="toggle${d.critical ? ' on' : ''}"><input type="checkbox" name="critical"${d.critical ? ' checked' : ''}>${ic('alert')}حرج</label>
         <label class="lbl">الاستحقاق<input name="due_date" type="date" value="${esc(d.due_date || '')}"></label>
-        <label class="lbl">مرجع WIR / NCR<input name="external_ref" value="${esc(d.external_ref || '')}" maxlength="60" dir="ltr"></label>
       </div>
       <p class="hint">كل تعديل يُسجَّل في سجل البند باسمك.</p>
     </div>
@@ -1480,7 +1501,7 @@ function filterSheet() {
       ${opt('type', '', 'الكل')}${opt('type', 'observation', 'ملاحظة فنية')}${opt('type', 'request', 'عمل مطلوب')}${opt('type', 'inspection', 'طلب فحص')}
     </div></div>
     <div class="fgroup"><h3>الأولوية</h3><div class="opts">
-      ${opt('prio', '', 'الكل')}${opt('prio', 'critical', 'حرجة')}${opt('prio', 'normal', 'عادية')}${opt('prio', 'low', 'منخفضة')}
+      ${opt('prio', '', 'الكل')}${opt('prio', 'critical', 'الحرجة فقط')}
     </div></div>
   </div>
   <div class="sheet-f two"><button class="btn ghost" data-act="clear-all">إعادة الضبط</button><button class="btn primary" data-act="close-sheet">عرض ${visible().length} بند</button></div>`;
@@ -1541,7 +1562,7 @@ window.addEventListener('popstate', () => {
 });
 
 function newAddData() {
-  return { type: 'observation', villa: S.f.villa || '', title: '', description: '', priority: 'normal', due: addDays(3), external_ref: '', open: false };
+  return { type: 'observation', villa: S.f.villa || '', title: '', description: '', critical: false, due: addDays(3) };
 }
 
 async function addPhotos(files) {
@@ -1569,7 +1590,7 @@ async function submitAdd(form) {
   const op = await enqueue({
     kind: 'create',
     params: { p_project: S.project.id, p_type: type, p_villa: villa, p_title: title, p_description: (v.description || '').trim(),
-      p_priority: v.priority || s.data.priority || 'normal', p_due: v.due || null, p_external_ref: (v.external_ref || '').trim() || null },
+      p_priority: v.critical ? 'critical' : 'normal', p_due: v.due || null, p_external_ref: null },
     photoPaths: photos.map(() => `${S.project.id}/${uuid()}.jpg`), blobs: photos.map(p => p.blob),
   });
   closeSheet();
@@ -1596,7 +1617,7 @@ async function submitAction(form) {
 async function submitEdit(form) {
   const s = S.sheet, v = readForm(form);
   const fields = { villa: toLatin(v.villa).trim(), title: v.title.trim(), description: v.description.trim(),
-    priority: v.priority, due_date: v.due_date || null, external_ref: (v.external_ref || '').trim() || null };
+    priority: v.critical ? 'critical' : (getItem(s.id)?.priority === 'low' ? 'low' : 'normal'), due_date: v.due_date || null };
   s.busy = true; renderSheet();
   try {
     const it = await api.edit(s.id, fields);
@@ -1649,6 +1670,12 @@ document.addEventListener('click', async e => {
     case 'demo-login': await api.signIn(b.dataset.role); start(); break;
     case 'open': openItem(b.dataset.key); break;
     case 'back': closeItem(); break;
+    case 'home':
+      Object.assign(S.f, { chip: null, q: '', villa: '', type: '', status: 'active', prio: '' });
+      if ($('#q')) $('#q').value = '';
+      S.view = 'home';
+      if (S.sel != null && !matchMedia('(min-width: 900px)').matches) closeItem();
+      renderAll(); $('#list') && ($('#list').scrollTop = 0); break;
     case 'view':
       S.view = b.dataset.view;
       if (S.view === 'home' && S.sel != null && !matchMedia('(min-width: 900px)').matches) closeItem();
@@ -1669,7 +1696,7 @@ document.addEventListener('click', async e => {
     }
     case 'rm-photo': S.sheet.photos.splice(+b.dataset.i, 1); renderSheet(); break;
     case 'act': openSheet({ kind: 'action', a: b.dataset.a, key: S.sel, photos: [], autofocus: 'textarea' }); break;
-    case 'edit': { const it = getItem(S.sel); openSheet({ kind: 'edit', id: it.id, data: { ...it } }); break; }
+    case 'edit': { const it = getItem(S.sel); openSheet({ kind: 'edit', id: it.id, data: { ...it, critical: it.priority === 'critical' } }); break; }
     case 'filter': openSheet({ kind: 'filter' }); break;
     case 'fset': S.f[b.dataset.k] = b.dataset.v; S.f.chip = null; renderSheet(); renderList(); break;
     case 'more': openSheet({ kind: 'more' }); break;
@@ -1696,9 +1723,9 @@ document.addEventListener('click', async e => {
 document.addEventListener('change', e => {
   const t = e.target;
   if (t.matches('input[data-photos]')) { if (t.files?.length) addPhotos(t.files); t.value = ''; return; }
-  if (t.name && S.sheet && ['add', 'edit'].includes(S.sheet.kind) && t.type === 'radio') {
+  if (t.name && S.sheet && ['add', 'edit'].includes(S.sheet.kind) && (t.type === 'radio' || t.type === 'checkbox')) {
     const due = t.form.querySelector('[name=due]');
-    if (S.sheet.kind === 'add' && t.name === 'priority' && t.value === 'critical' && due && (!due.value || due.value > addDays(1))) due.value = addDays(1);
+    if (S.sheet.kind === 'add' && t.name === 'critical' && t.checked && due && (!due.value || due.value > addDays(1))) due.value = addDays(1);
     renderSheet();
   }
 });
