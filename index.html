@@ -473,6 +473,40 @@ details.more summary small { color: var(--muted); font-weight: 400; margin-inlin
   .topnav button { min-height: 48px; }
 }
 
+/* ---------- v5: نموذج بلا تمرير، زر إضافة عريض ---------- */
+.topnav { grid-template-columns: 2fr 1fr 1fr; }
+.topnav button.add { grid-auto-flow: column; gap: 8px; font-size: 15px; }
+.brand { cursor: pointer; }
+.sheet-body { overflow-x: hidden; gap: 10px; }
+.sheet-body > * { min-width: 0; }
+.vt { display: grid; grid-template-columns: 88px minmax(0, 1fr); gap: 8px; }
+.vt input { font-variant-numeric: tabular-nums; }
+.opts3 { display: grid; grid-template-columns: 1fr 1fr 1.35fr; gap: 8px; }
+.opts3 > * { min-width: 0; min-height: 46px; }
+.opts3 .btn { padding: 0 6px; cursor: pointer; }
+.opts3 .toggle { align-self: stretch; }
+.opts3 input[type=date] { padding: 8px 6px; font-size: 14.5px; text-align: center; -webkit-appearance: none; appearance: none; min-width: 0; width: 100%; }
+#add-form textarea { min-height: 64px; }
+.fixed-type { padding: 8px 12px; font-size: 14.5px; }
+.seg label { min-height: 42px; }
+@media (min-width: 900px) { .topnav { grid-template-columns: 168px 84px 84px; } }
+.topnav button.add { display: flex; align-items: center; justify-content: center; gap: 8px; }
+/* v6: مؤشرات داخل التصفية + موعد اختياري */
+.shell { grid-template-rows: auto minmax(0, 1fr); grid-template-areas: "top" "main"; }
+.opt .oc { font-variant-numeric: tabular-nums; opacity: .7; margin-inline-start: 2px; }
+.datef { position: relative; display: block; min-width: 0; }
+.datef input { width: 100%; height: 100%; min-height: 46px; padding: 8px 6px; font-size: 14.5px; text-align: center; -webkit-appearance: none; appearance: none; }
+.datef span { position: absolute; inset: 1px; display: flex; align-items: center; justify-content: center; gap: 5px; border-radius: 10px; background: var(--bg); color: var(--muted); font-weight: 700; pointer-events: none; }
+.datef span .ic { width: 17px; height: 17px; }
+.datef.has span { display: none; }
+@media (min-width: 900px) { .shell { grid-template-rows: auto minmax(0, 1fr); grid-template-areas: "top top" "list detail"; } }
+.datef { display: block; }
+.datef label { display: block; position: relative; height: 100%; }
+.dclr { position: absolute; top: 50%; inset-inline-end: 4px; transform: translateY(-50%); width: 28px; height: 28px; border-radius: 50%; border: 0; background: var(--surface2); color: var(--muted); display: grid; place-items: center; padding: 0; z-index: 2; }
+.dclr .ic { width: 15px; height: 15px; stroke-width: 2.4; }
+.datef.has input { padding-inline-end: 34px; }
+.datef.has input { padding-inline-end: 36px; font-size: 13.5px; }
+
 </style>
 </head>
 <body>
@@ -714,10 +748,9 @@ function demoApi() {
       if (p.p_client_id) { const ex = db.items.find(i => i.client_id === p.p_client_id); if (ex) return ex; }
       if (m.role === 'contractor' && p.p_type !== 'inspection') throw E('المقاول يضيف طلبات فحص فقط');
       if (m.role === 'consultant' && p.p_type === 'inspection') throw E('طلب الفحص يضيفه المقاول');
-      if (!p.p_villa?.trim()) throw E('رقم الفيلا مطلوب');
       if ((p.p_title || '').trim().length < 2) throw E('العنوان قصير جدًا');
       const now = new Date().toISOString();
-      const it = { id: ++db.seq, project_id: PROJECT.id, type: p.p_type, villa: p.p_villa.trim(), title: p.p_title.trim(),
+      const it = { id: ++db.seq, project_id: PROJECT.id, type: p.p_type, villa: (p.p_villa || '').trim(), title: p.p_title.trim(),
         description: p.p_description || '', priority: p.p_priority || 'normal',
         status: p.p_type === 'inspection' ? 'review' : 'open', hold_reason: null, due_date: p.p_due || null,
         external_ref: p.p_external_ref || null, return_count: 0, created_by: m.id, created_at: now, updated_at: now,
@@ -909,6 +942,9 @@ async function compressImage(file, maxSide = LIVE ? 1600 : 900, quality = LIVE ?
 // JENAN | Civil Site Coordination — الواجهة
 
 // ---------- نصوص ----------
+const OTHER = () => (S.me?.role === 'consultant' ? 'المقاول' : 'الاستشاري');
+const FS = { active: 'النشطة', inactive: 'المتوقفة والمغلقة', critical: 'الحرجة', overdue: 'المتأخرة' };
+const FT = () => ({ observation: 'ملاحظة', mine: 'مطلوب مني', theirs: 'بانتظار ' + OTHER() });
 const T = {
   type: { observation: 'ملاحظة فنية', request: 'عمل مطلوب', inspection: 'طلب فحص' },
   typeShort: { observation: 'ملاحظة', request: 'طلب', inspection: 'فحص' },
@@ -1037,8 +1073,13 @@ function matchQ(it, q) {
 function visible() {
   const f = S.f;
   let a = allItems();
-  if (f.status === 'active') a = a.filter(active); else if (f.status) a = a.filter(i => i.status === f.status);
-  if (f.type) a = a.filter(i => i.type === f.type);
+  if (f.status === 'active') a = a.filter(active);
+  else if (f.status === 'inactive') a = a.filter(i => i.status === 'hold' || i.status === 'closed');
+  else if (f.status === 'critical') a = a.filter(i => active(i) && i.priority === 'critical');
+  else if (f.status === 'overdue') a = a.filter(overdue);
+  if (f.type === 'mine') a = a.filter(isMine);
+  else if (f.type === 'theirs') a = a.filter(i => active(i) && ballWith(i) && ballWith(i) !== S.me.role);
+  else if (f.type) a = a.filter(i => i.type === f.type);
   if (f.prio) a = a.filter(i => i.priority === f.prio);
   if (f.villa) a = a.filter(i => i.villa === f.villa);
   if (f.chip === 'mine') a = a.filter(isMine);
@@ -1109,9 +1150,8 @@ function renderShell() {
   document.getElementById('app').innerHTML = `
   <div class="shell">
     <header class="top">
-      <div class="brand"><div class="logo sm">ج</div><div class="bt"><b>جنان</b><small>${esc(S.project.name)}</small></div></div>
+      <div class="brand" data-act="home" role="button" aria-label="الرئيسية"><div class="logo sm">ج</div><div class="bt"><b>جنان</b><small>${esc(S.project.name)}</small></div></div>
       <nav class="topnav" aria-label="التنقل">
-        <button data-act="home" id="nb-home">${ic('home')}<span>الرئيسية</span></button>
         <button class="add" data-act="add">${ic('plus')}<span>إضافة</span></button>
         <button data-act="filter" id="nb-filter">${ic('filter')}<span>تصفية</span></button>
         <button data-act="more">${ic('user')}<span>حسابي</span></button>
@@ -1119,7 +1159,6 @@ function renderShell() {
       <label class="search">${ic('search')}<input id="q" type="search" placeholder="رقم الفيلا أو كلمة" enterkeyhint="search" aria-label="بحث"></label>
       <button class="sync" id="sync" data-act="more" aria-label="حالة المزامنة"></button>
     </header>
-    <nav class="chips" id="chips" aria-label="مؤشرات سريعة"></nav>
     <main class="main">
       <section class="listpane" aria-label="البنود">
         <div class="listhead" id="listhead"></div>
@@ -1150,6 +1189,7 @@ function renderSync() {
 }
 
 function renderChips() {
+  $('#nb-filter')?.classList.toggle('on', !!(S.f.type || S.f.status !== 'active'));
   const el = $('#chips'); if (!el) return;
   const a = allItems().filter(active);
   const chips = [
@@ -1167,9 +1207,7 @@ function renderChips() {
 function filterSummary() {
   const f = S.f, parts = [];
   if (f.villa) parts.push(`<button class="pill" data-act="clear" data-k="villa">فيلا ${esc(f.villa)} ${ic('x')}</button>`);
-  if (f.type) parts.push(`<button class="pill" data-act="clear" data-k="type">${T.type[f.type]} ${ic('x')}</button>`);
-  if (f.prio) parts.push(`<button class="pill" data-act="clear" data-k="prio">${T.prio[f.prio]} ${ic('x')}</button>`);
-  if (f.status !== 'active') parts.push(`<button class="pill" data-act="clear" data-k="status">${f.status ? T.status[f.status] : 'الكل'} ${ic('x')}</button>`);
+  if (f.type) parts.push(`<button class="pill" data-act="clear" data-k="type">${FT()[f.type]} ${ic('x')}</button>`);
   return parts.join('');
 }
 
@@ -1179,7 +1217,7 @@ function cardHTML(it) {
   return `
   <button class="card p-${it.priority}${sel ? ' sel' : ''}${active(it) ? '' : ' done'}" data-act="open" data-key="${esc(String(it.id))}">
     <div class="c1">
-      <span class="villa">${esc(it.villa)}</span>
+      ${it.villa ? `<span class="villa">${esc(it.villa)}</span>` : ''}
       <span class="title">${esc(it.title)}</span>
       ${unread(it) ? `<span class="newdot" title="جديد">${ic('dot')}</span>` : ''}
     </div>
@@ -1201,8 +1239,7 @@ function renderList() {
     return;
   }
   const v = visible();
-  const label = S.f.chip ? { mine: 'عليّ الآن', overdue: 'المتأخرة', critical: 'الحرجة', new: 'الجديدة' }[S.f.chip]
-    : S.f.status === 'active' ? 'البنود النشطة' : 'البنود';
+  const label = 'البنود ' + (FS[S.f.status] || FS.active);
   head.innerHTML = `<h2>${label} <span class="count">${v.length}</span></h2><div class="pills">${filterSummary()}</div>`;
   if (!S.loaded && !v.length) { list.innerHTML = `<div class="empty">${ic('sync', 'spin')}<p>جارٍ تحميل البنود…</p></div>`; return; }
   if (!v.length) {
@@ -1216,7 +1253,7 @@ function renderList() {
 
 function villasHTML() {
   const m = new Map();
-  for (const it of allItems()) {
+  for (const it of allItems().filter(i => i.villa)) {
     const v = m.get(it.villa) || { villa: it.villa, active: 0, late: 0, crit: 0, mine: 0, total: 0 };
     v.total++;
     if (active(it)) { v.active++; if (overdue(it)) v.late++; if (it.priority === 'critical') v.crit++; if (isMine(it)) v.mine++; }
@@ -1310,7 +1347,7 @@ function renderDetail() {
     <button class="iconbtn narrow-only" data-act="back" aria-label="رجوع">${ic('back')}</button>
     <span class="ref">${it.pending ? 'جديد' : '#' + it.id}</span>
     <span class="tag">${T.type[it.type]}</span>
-    <span class="tag villa-tag">فيلا ${esc(it.villa)}</span>
+    ${it.villa ? `<span class="tag villa-tag">فيلا ${esc(it.villa)}</span>` : ''}
     <span class="grow"></span>
     ${canEdit ? `<button class="iconbtn" data-act="edit" aria-label="تعديل">${ic('edit')}</button>` : ''}
     <button class="iconbtn wide-only" data-act="back" aria-label="إغلاق">${ic('x')}</button>
@@ -1422,25 +1459,25 @@ const sheetHead = (title, extra = '') =>
 function addSheet(s) {
   const R = S.me.role, d = s.data;
   const types = R === 'consultant' ? seg('type', [['observation', 'ملاحظة فنية', 'flag'], ['request', 'عمل مطلوب', 'chat']], d.type)
-    : `<div class="fixed-type">${ic('checkc')}طلب فحص <small>يُرسل للاستشاري للمعاينة والاستلام</small></div>`;
+    : `<div class="fixed-type">${ic('checkc')}طلب فحص يُرسل للاستشاري</div>`;
   return `
   <form id="add-form" class="sheet-form" data-sk="add">
     ${sheetHead(R === 'consultant' ? 'بند جديد' : 'طلب فحص جديد')}
     <div class="sheet-body">
       ${types}
-      <label class="lbl">رقم الفيلا / الموقع
-        <input name="villa" value="${esc(d.villa)}" required maxlength="40" inputmode="text" autocomplete="off" placeholder="مثال: 169">
-      </label>
-      <div class="quick">${recentVillas().map(v => `<button type="button" class="qv${d.villa === v ? ' on' : ''}" data-act="qv" data-v="${esc(v)}">${esc(v)}</button>`).join('')}</div>
-      <label class="lbl">العنوان
-        <input name="title" value="${esc(d.title)}" required minlength="2" maxlength="200" autocomplete="off" placeholder="${R === 'consultant' ? 'مثال: إزالة الصخور قبل طبقة الدفان التالية' : 'مثال: الدفان حول الخزان جاهز للاستلام'}">
-      </label>
-      ${photoPicker(s, 'صور')}
-      <label class="lbl">الوصف<textarea name="description" rows="2" maxlength="4000" placeholder="اختياري">${esc(d.description)}</textarea></label>
-      <div class="row2">
-        <label class="toggle${d.critical ? ' on' : ''}"><input type="checkbox" name="critical"${d.critical ? ' checked' : ''}>${ic('alert')}حرج</label>
-        <label class="lbl">الاستحقاق<input name="due" type="date" value="${esc(d.due)}"></label>
+      <div class="vt">
+        <label class="lbl">الفيلا<input name="villa" value="${esc(d.villa)}" maxlength="40" autocomplete="off" placeholder="اختياري"></label>
+        <label class="lbl">العنوان<input name="title" value="${esc(d.title)}" required minlength="2" maxlength="200" autocomplete="off"></label>
       </div>
+      <div class="opts3">
+        <label class="btn ghost">${ic('image')}صور<input type="file" accept="image/*" multiple data-photos hidden></label>
+        <label class="toggle${d.critical ? ' on' : ''}"><input type="checkbox" name="critical"${d.critical ? ' checked' : ''}>${ic('alert')}حرج</label>
+        <div class="datef${d.due ? ' has' : ''}"><label><span>${ic('clock')}موعد</span><input name="due" type="date" value="${esc(d.due)}" aria-label="تاريخ الاستحقاق (اختياري)"></label>${d.due ? `<button type="button" class="dclr" data-act="clear-due" aria-label="إلغاء الموعد">${ic('x')}</button>` : ''}</div>
+      </div>
+      ${(s.photos || []).length || s.busy ? `<div class="thumbs">${(s.photos || []).map((p, i) => `
+        <span class="thumb"><img src="${p.url}" alt=""><button type="button" data-act="rm-photo" data-i="${i}" aria-label="حذف">${ic('x')}</button></span>`).join('')}
+        ${s.busy ? `<span class="thumb busy">${ic('sync', 'spin')}</span>` : ''}</div>` : ''}
+      <textarea name="description" rows="2" maxlength="4000" placeholder="وصف (اختياري)">${esc(d.description)}</textarea>
     </div>
     <div class="sheet-f"><button class="btn primary block" type="submit"${s.busy ? ' disabled' : ''}>${ic('check')}حفظ</button></div>
   </form>`;
@@ -1461,7 +1498,7 @@ function actionSheet(s) {
   <form id="action-form" class="sheet-form" data-sk="action">
     ${sheetHead(c.title)}
     <div class="sheet-body">
-      <p class="ctx"><b>فيلا ${esc(it?.villa)}</b> · ${esc(it?.title)}</p>
+      <p class="ctx">${it?.villa ? `<b>فيلا ${esc(it.villa)}</b> · ` : ''}${esc(it?.title)}</p>
       <textarea name="body" rows="3" maxlength="4000" placeholder="${c.ph}"${c.need === 'text' ? ' required' : ''}>${esc(s.body || '')}</textarea>
       ${c.photo ? photoPicker(s, c.photo) : ''}
     </div>
@@ -1475,7 +1512,7 @@ function editSheet(s) {
   <form id="edit-form" class="sheet-form" data-sk="edit">
     ${sheetHead('تعديل البند')}
     <div class="sheet-body">
-      <label class="lbl">رقم الفيلا / الموقع<input name="villa" value="${esc(d.villa)}" required maxlength="40"></label>
+      <label class="lbl">الفيلا<input name="villa" value="${esc(d.villa)}" maxlength="40" placeholder="اختياري"></label>
       <label class="lbl">العنوان<input name="title" value="${esc(d.title)}" required minlength="2" maxlength="200"></label>
       <label class="lbl">الوصف<textarea name="description" rows="3" maxlength="4000">${esc(d.description)}</textarea></label>
       <div class="row2">
@@ -1491,17 +1528,15 @@ function editSheet(s) {
 function filterSheet() {
   const f = S.f;
   const opt = (k, v, t) => `<button type="button" class="opt${f[k] === v ? ' on' : ''}" data-act="fset" data-k="${k}" data-v="${v}">${t}</button>`;
+  const ft = FT();
   return `
   ${sheetHead('تصفية')}
   <div class="sheet-body">
     <div class="fgroup"><h3>الحالة</h3><div class="opts">
-      ${opt('status', 'active', 'النشطة')}${opt('status', 'open', 'مفتوح')}${opt('status', 'review', 'بانتظار المراجعة')}${opt('status', 'hold', 'متوقف')}${opt('status', 'closed', 'مغلق')}${opt('status', '', 'الكل')}
+      ${Object.entries(FS).map(([v, t]) => opt('status', v, t)).join('')}
     </div></div>
     <div class="fgroup"><h3>النوع</h3><div class="opts">
-      ${opt('type', '', 'الكل')}${opt('type', 'observation', 'ملاحظة فنية')}${opt('type', 'request', 'عمل مطلوب')}${opt('type', 'inspection', 'طلب فحص')}
-    </div></div>
-    <div class="fgroup"><h3>الأولوية</h3><div class="opts">
-      ${opt('prio', '', 'الكل')}${opt('prio', 'critical', 'الحرجة فقط')}
+      ${opt('type', '', 'الكل')}${Object.entries(ft).map(([v, t]) => opt('type', v, t)).join('')}
     </div></div>
   </div>
   <div class="sheet-f two"><button class="btn ghost" data-act="clear-all">إعادة الضبط</button><button class="btn primary" data-act="close-sheet">عرض ${visible().length} بند</button></div>`;
@@ -1562,7 +1597,7 @@ window.addEventListener('popstate', () => {
 });
 
 function newAddData() {
-  return { type: 'observation', villa: S.f.villa || '', title: '', description: '', critical: false, due: addDays(3) };
+  return { type: 'observation', villa: S.f.villa || '', title: '', description: '', critical: false, due: '' };
 }
 
 async function addPhotos(files) {
@@ -1584,7 +1619,6 @@ async function submitAdd(form) {
   const s = S.sheet, v = readForm(form);
   const type = S.me.role === 'contractor' ? 'inspection' : (v.type || 'observation');
   const villa = toLatin(v.villa || '').trim(), title = (v.title || '').trim();
-  if (!villa) return toast('اكتب رقم الفيلا', 'err');
   if (title.length < 2) return toast('اكتب عنوانًا مختصرًا', 'err');
   const photos = s.photos || [];
   const op = await enqueue({
@@ -1681,7 +1715,7 @@ document.addEventListener('click', async e => {
       if (S.view === 'home' && S.sel != null && !matchMedia('(min-width: 900px)').matches) closeItem();
       renderList(); break;
     case 'pick-villa': S.f.villa = b.dataset.v; S.f.chip = null; S.view = 'home'; renderAll(); break;
-    case 'chip': S.f.chip = S.f.chip === b.dataset.k ? null : b.dataset.k; if (S.view !== 'home') S.view = 'home'; renderChips(); renderList(); break;
+    case 'chip': S.f.chip = S.f.chip === b.dataset.k ? null : b.dataset.k; if (S.view !== 'home') S.view = 'home'; renderChips(); renderList(); if (S.sheet?.kind === 'filter') renderSheet(); break;
     case 'clear': if (b.dataset.k === 'status') S.f.status = 'active'; else S.f[b.dataset.k] = ''; renderList(); break;
     case 'clear-all':
       Object.assign(S.f, { chip: null, q: '', villa: '', type: '', status: 'active', prio: '' });
@@ -1694,11 +1728,12 @@ document.addEventListener('click', async e => {
       f.querySelector('[name=villa]').value = b.dataset.v;
       renderSheet(); $('#add-form [name=title]')?.focus(); break;
     }
+    case 'clear-due': { const i = document.querySelector('#add-form [name=due]'); if (i) { i.value = ''; renderSheet(); } break; }
     case 'rm-photo': S.sheet.photos.splice(+b.dataset.i, 1); renderSheet(); break;
     case 'act': openSheet({ kind: 'action', a: b.dataset.a, key: S.sel, photos: [], autofocus: 'textarea' }); break;
     case 'edit': { const it = getItem(S.sel); openSheet({ kind: 'edit', id: it.id, data: { ...it, critical: it.priority === 'critical' } }); break; }
     case 'filter': openSheet({ kind: 'filter' }); break;
-    case 'fset': S.f[b.dataset.k] = b.dataset.v; S.f.chip = null; renderSheet(); renderList(); break;
+    case 'fset': S.f[b.dataset.k] = b.dataset.v; S.f.chip = null; renderSheet(); renderList(); renderChips(); break;
     case 'more': openSheet({ kind: 'more' }); break;
     case 'close-sheet': if (e.target === b || b.tagName === 'BUTTON' || b.classList.contains('lightbox')) closeSheet(); break;
     case 'photo': if (b.dataset.src) openSheet({ kind: 'photo', src: b.dataset.src }); break;
@@ -1723,9 +1758,8 @@ document.addEventListener('click', async e => {
 document.addEventListener('change', e => {
   const t = e.target;
   if (t.matches('input[data-photos]')) { if (t.files?.length) addPhotos(t.files); t.value = ''; return; }
-  if (t.name && S.sheet && ['add', 'edit'].includes(S.sheet.kind) && (t.type === 'radio' || t.type === 'checkbox')) {
+  if (t.name && S.sheet && ['add', 'edit'].includes(S.sheet.kind) && (t.type === 'radio' || t.type === 'checkbox' || t.type === 'date')) {
     const due = t.form.querySelector('[name=due]');
-    if (S.sheet.kind === 'add' && t.name === 'critical' && t.checked && due && (!due.value || due.value > addDays(1))) due.value = addDays(1);
     renderSheet();
   }
 });
